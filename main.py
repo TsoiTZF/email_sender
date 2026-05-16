@@ -130,11 +130,24 @@ class EmailSenderPlugin(Star):
 
     async def _generate_email_content(self, subject: str, content_hint: str, recipient: str) -> str:
         """生成邮件内容"""
+        # 尝试获取 AstrBot 配置的人设
+        persona = ""
+        try:
+            # 从 AstrBot 配置中读取人设
+            astrbot_config = self.context.get_config()
+            if astrbot_config:
+                persona = astrbot_config.get("persona_prompt", "") or astrbot_config.get("persona", "")
+        except Exception:
+            pass
+
+        # 构建提示词
+        persona_info = f"\n你的人设是：{persona}" if persona else ""
         prompt = self.content_prompt.format(
             subject=subject,
             content_hint=content_hint or "请根据主题生成合适的内容",
             recipient=recipient
-        )
+        ) + persona_info
+
         content = await self._call_llm(prompt)
         return content.strip() if content else ""
 
