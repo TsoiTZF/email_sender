@@ -24,14 +24,9 @@
     "type": "bool",
     "default": true
   },
-  "llm.intent_prompt": {
-    "description": "意图判断提示词（可自定义）",
-    "type": "text",
-    "default": ""
-  },
-  "llm.content_prompt": {
-    "description": "邮件内容生成提示词（可自定义）",
-    "type": "text",
-    "default": ""
+  "enable_llm_tool": {
+    "description": "是否启用 LLM Tool（让 AI 自动调用邮件发送功能）",
+    "type": "bool",
+    "default": true
   }
 }

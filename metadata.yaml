@@ -1,9 +1,9 @@
 name: email_sender
 display_name: 邮件发送助手
-desc: 智能邮件发送插件，支持 LLM 意图判断、多轮对话确认收件人、根据人设生成邮件内容
-version: v1.0.0
+desc: 基于 LLM Tool 的智能邮件发送插件，支持人设化交互和精致 HTML 邮件
+version: v2.0.0
 author: 势魏延
-repo: https://github.com/势魏延/email_sender
+repo: https://github.com/TsoiTZF/email_sender
 astrbot_version: ">=4.16.0"
 support_platforms:
   - aiocqhttp
