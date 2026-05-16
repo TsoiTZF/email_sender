@@ -259,7 +259,7 @@ class EmailSenderPlugin(Star):
         elif intent.get("target_qq"):
             session.target_qq = intent["target_qq"]
             session.step = "ask_email_type"
-            event.set_result(f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复"是"或提供其他邮箱地址）")
+            event.set_result(f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复「是」或提供其他邮箱地址）")
         else:
             session.step = "ask_target"
             event.set_result("请告诉我收件人的 QQ 号或邮箱地址～")
@@ -304,7 +304,7 @@ class EmailSenderPlugin(Star):
         if qq_match:
             session.target_qq = qq_match.group()
             session.step = "ask_email_type"
-            event.set_result(f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复"是"或提供其他邮箱地址）")
+            event.set_result(f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复「是」或提供其他邮箱地址）")
             return
 
         event.set_result("没有识别到有效的 QQ 号或邮箱地址，请重新输入～")
@@ -320,13 +320,13 @@ class EmailSenderPlugin(Star):
             session.step = "ask_subject"
             event.set_result(f"好的，收件邮箱是 {session.target_email}。请告诉我邮件主题～")
         else:
-            event.set_result("请回复"是"发送到 QQ 邮箱，或提供其他邮箱地址～")
+            event.set_result("请回复「是」发送到 QQ 邮箱，或提供其他邮箱地址～")
 
     async def _handle_ask_subject(self, event: AstrMessageEvent, session: EmailSession, message: str):
         """处理主题输入"""
         session.subject = message
         session.step = "ask_content"
-        event.set_result("好的，主题已记录。请告诉我邮件内容要点（我会帮你润色），或回复"自动生成"让我根据主题生成～")
+        event.set_result("好的，主题已记录。请告诉我邮件内容要点（我会帮你润色），或回复「自动生成」让我根据主题生成～")
 
     async def _handle_ask_content(self, event: AstrMessageEvent, session: EmailSession, message: str):
         """处理内容输入"""
@@ -362,7 +362,7 @@ class EmailSenderPlugin(Star):
 {session.content}
 
 ─────────────────
-确认发送吗？（回复"是"发送，"否"取消）"""
+确认发送吗？（回复「是」发送，「否」取消）"""
 
         event.set_result(preview)
 
@@ -408,7 +408,7 @@ class EmailSenderPlugin(Star):
         elif target_qq:
             session.target_qq = target_qq
             session.step = "ask_email_type"
-            event.set_result(f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复"是"或提供其他邮箱地址）")
+            event.set_result(f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复「是」或提供其他邮箱地址）")
         else:
             session.step = "ask_target"
             event.set_result("检测到你想发邮件，请告诉我收件人的 QQ 号或邮箱地址～")
