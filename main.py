@@ -68,7 +68,7 @@ class EmailSenderPlugin(Star):
 4. 内容要有礼貌，结构清晰，适当分段"""
 
         # 人设化提示语生成模板
-        self.persona_prompt_template = """你需要用指定的人设风格来回复用户。只回复一句话，不要有其他说明。
+        self.persona_prompt_template = """你需要用指定的人设风格来回复用户。这是邮件发送插件的交互场景，你正在帮助用户发送邮件。只回复一句话，不要有其他说明。
 
 人设：{persona}
 场景：{scene}
