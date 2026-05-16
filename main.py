@@ -249,7 +249,24 @@ class EmailSenderPlugin(Star):
             event.set_result("请告诉我收件人的 QQ 号或邮箱地址～")
             return
 
-        # 尝试解析消息
+        # 先用正则提取，不依赖 LLM
+        # 检查是否是邮箱
+        email_match = re.search(r'[\w.-]+@[\w.-]+\.\w+', message)
+        if email_match:
+            session.target_email = email_match.group()
+            session.step = "ask_subject"
+            event.set_result(f"好的，收件邮箱是 {session.target_email}。请告诉我邮件主题～")
+            return
+
+        # 检查是否是 QQ 号
+        qq_match = re.search(r'\b\d{5,12}\b', message)
+        if qq_match:
+            session.target_qq = qq_match.group()
+            session.step = "ask_email_type"
+            event.set_result(f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复「是」或提供其他邮箱地址）")
+            return
+
+        # 都没匹配到，调用 LLM 尝试解析
         intent = await self._parse_intent(message)
 
         if intent.get("target_email"):
