@@ -63,10 +63,44 @@ class EmailSenderPlugin(Star):
 
 要求:
 1. 内容简洁，不要太长（100-200字左右）
-2. 语气友好、专业
-3. 不要使用 Markdown 格式
-4. 直接输出邮件正文内容，不要有其他说明
-5. 内容要有礼貌，结构清晰，适当分段"""
+2. 不要使用 Markdown 格式
+3. 直接输出邮件正文内容，不要有其他说明
+4. 内容要有礼貌，结构清晰，适当分段"""
+
+        # 人设化提示语生成模板
+        self.persona_prompt_template = """你需要用指定的人设风格来回复用户。只回复一句话，不要有其他说明。
+
+人设：{persona}
+场景：{scene}
+要求：{requirement}"""
+
+    def _get_persona(self) -> str:
+        """获取 AstrBot 配置的人设"""
+        try:
+            astrbot_config = self.context.get_config()
+            if astrbot_config:
+                # 尝试多种可能的字段名
+                return (astrbot_config.get("persona_prompt", "") or
+                        astrbot_config.get("persona", "") or
+                        astrbot_config.get("人格设定", "") or
+                        astrbot_config.get("personality", "") or "")
+        except Exception:
+            pass
+        return ""
+
+    async def _generate_persona_reply(self, scene: str, requirement: str) -> str:
+        """根据人设生成回复"""
+        persona = self._get_persona()
+        if not persona:
+            return ""
+
+        prompt = self.persona_prompt_template.format(
+            persona=persona,
+            scene=scene,
+            requirement=requirement
+        )
+        reply = await self._call_llm(prompt)
+        return reply.strip() if reply else ""
 
     def _get_session_key(self, event: AstrMessageEvent) -> str:
         """获取会话唯一标识"""
@@ -130,15 +164,8 @@ class EmailSenderPlugin(Star):
 
     async def _generate_email_content(self, subject: str, content_hint: str, recipient: str) -> str:
         """生成邮件内容"""
-        # 尝试获取 AstrBot 配置的人设
-        persona = ""
-        try:
-            # 从 AstrBot 配置中读取人设
-            astrbot_config = self.context.get_config()
-            if astrbot_config:
-                persona = astrbot_config.get("persona_prompt", "") or astrbot_config.get("persona", "")
-        except Exception:
-            pass
+        # 获取人设
+        persona = self._get_persona()
 
         # 构建提示词
         persona_info = f"\n你的人设是：{persona}" if persona else ""
@@ -247,6 +274,11 @@ class EmailSenderPlugin(Star):
             logger.error(f"邮件发送失败: {e}")
             return False
 
+    async def _get_reply(self, scene: str, requirement: str, fallback: str) -> str:
+        """获取人设化回复，如果没有人设则返回默认回复"""
+        reply = await self._generate_persona_reply(scene, requirement)
+        return reply if reply else fallback
+
     @filter.command("发邮件")
     async def handle_email_command(self, event: AstrMessageEvent):
         """处理 /发邮件 命令"""
@@ -258,7 +290,12 @@ class EmailSenderPlugin(Star):
 
         if not message:
             session.step = "ask_target"
-            event.set_result("请告诉我收件人的 QQ 号或邮箱地址～")
+            reply = await self._get_reply(
+                "用户触发了发邮件命令，但没有提供收件人",
+                "询问用户收件人的 QQ 号或邮箱地址",
+                "请告诉我收件人的 QQ 号或邮箱地址～"
+            )
+            event.set_result(reply)
             return
 
         # 先用正则提取，不依赖 LLM
@@ -267,7 +304,12 @@ class EmailSenderPlugin(Star):
         if email_match:
             session.target_email = email_match.group()
             session.step = "ask_subject"
-            event.set_result(f"好的，收件邮箱是 {session.target_email}。请告诉我邮件主题～")
+            reply = await self._get_reply(
+                f"用户要发邮件到 {session.target_email}",
+                "确认收件邮箱，并询问邮件主题",
+                f"好的，收件邮箱是 {session.target_email}。请告诉我邮件主题～"
+            )
+            event.set_result(reply)
             return
 
         # 检查是否是 QQ 号
@@ -275,7 +317,12 @@ class EmailSenderPlugin(Star):
         if qq_match:
             session.target_qq = qq_match.group()
             session.step = "ask_email_type"
-            event.set_result(f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复「是」或提供其他邮箱地址）")
+            reply = await self._get_reply(
+                f"用户要给 QQ 号 {session.target_qq} 发邮件",
+                "询问是否发送到 QQ 邮箱，或提供其他邮箱地址",
+                f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复「是」或提供其他邮箱地址）"
+            )
+            event.set_result(reply)
             return
 
         # 都没匹配到，调用 LLM 尝试解析
@@ -284,14 +331,29 @@ class EmailSenderPlugin(Star):
         if intent.get("target_email"):
             session.target_email = intent["target_email"]
             session.step = "ask_subject"
-            event.set_result(f"好的，收件邮箱是 {session.target_email}。请告诉我邮件主题～")
+            reply = await self._get_reply(
+                f"用户要发邮件到 {session.target_email}",
+                "确认收件邮箱，并询问邮件主题",
+                f"好的，收件邮箱是 {session.target_email}。请告诉我邮件主题～"
+            )
+            event.set_result(reply)
         elif intent.get("target_qq"):
             session.target_qq = intent["target_qq"]
             session.step = "ask_email_type"
-            event.set_result(f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复「是」或提供其他邮箱地址）")
+            reply = await self._get_reply(
+                f"用户要给 QQ 号 {session.target_qq} 发邮件",
+                "询问是否发送到 QQ 邮箱，或提供其他邮箱地址",
+                f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复「是」或提供其他邮箱地址）"
+            )
+            event.set_result(reply)
         else:
             session.step = "ask_target"
-            event.set_result("请告诉我收件人的 QQ 号或邮箱地址～")
+            reply = await self._get_reply(
+                "用户触发了发邮件命令，但没有提供收件人",
+                "询问用户收件人的 QQ 号或邮箱地址",
+                "请告诉我收件人的 QQ 号或邮箱地址～"
+            )
+            event.set_result(reply)
 
     @filter.event_message_type
     async def handle_message(self, event: AstrMessageEvent):
@@ -325,7 +387,12 @@ class EmailSenderPlugin(Star):
         if email_match:
             session.target_email = email_match.group()
             session.step = "ask_subject"
-            event.set_result(f"好的，收件邮箱是 {session.target_email}。请告诉我邮件主题～")
+            reply = await self._get_reply(
+                f"用户提供了收件邮箱 {session.target_email}",
+                "确认收件邮箱，并询问邮件主题",
+                f"好的，收件邮箱是 {session.target_email}。请告诉我邮件主题～"
+            )
+            event.set_result(reply)
             return
 
         # 检查是否是 QQ 号
@@ -333,29 +400,59 @@ class EmailSenderPlugin(Star):
         if qq_match:
             session.target_qq = qq_match.group()
             session.step = "ask_email_type"
-            event.set_result(f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复「是」或提供其他邮箱地址）")
+            reply = await self._get_reply(
+                f"用户提供了 QQ 号 {session.target_qq}",
+                "询问是否发送到 QQ 邮箱，或提供其他邮箱地址",
+                f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复「是」或提供其他邮箱地址）"
+            )
+            event.set_result(reply)
             return
 
-        event.set_result("没有识别到有效的 QQ 号或邮箱地址，请重新输入～")
+        reply = await self._get_reply(
+            "用户提供的收件人信息无法识别",
+            "提示用户输入有效的 QQ 号或邮箱地址",
+            "没有识别到有效的 QQ 号或邮箱地址，请重新输入～"
+        )
+        event.set_result(reply)
 
     async def _handle_ask_email_type(self, event: AstrMessageEvent, session: EmailSession, message: str):
         """处理邮箱类型确认"""
         if message in ["是", "对", "好", "嗯", "y", "yes", "Y", "Yes"]:
             session.target_email = f"{session.target_qq}@qq.com"
             session.step = "ask_subject"
-            event.set_result(f"好的，将发送到 {session.target_email}。请告诉我邮件主题～")
+            reply = await self._get_reply(
+                f"用户确认发送到 QQ 邮箱 {session.target_email}",
+                "确认收件邮箱，并询问邮件主题",
+                f"好的，将发送到 {session.target_email}。请告诉我邮件主题～"
+            )
+            event.set_result(reply)
         elif "@" in message:
             session.target_email = message
             session.step = "ask_subject"
-            event.set_result(f"好的，收件邮箱是 {session.target_email}。请告诉我邮件主题～")
+            reply = await self._get_reply(
+                f"用户提供了其他邮箱 {session.target_email}",
+                "确认收件邮箱，并询问邮件主题",
+                f"好的，收件邮箱是 {session.target_email}。请告诉我邮件主题～"
+            )
+            event.set_result(reply)
         else:
-            event.set_result("请回复「是」发送到 QQ 邮箱，或提供其他邮箱地址～")
+            reply = await self._get_reply(
+                "用户没有明确回复邮箱类型",
+                "提示用户回复「是」发送到 QQ 邮箱，或提供其他邮箱地址",
+                "请回复「是」发送到 QQ 邮箱，或提供其他邮箱地址～"
+            )
+            event.set_result(reply)
 
     async def _handle_ask_subject(self, event: AstrMessageEvent, session: EmailSession, message: str):
         """处理主题输入"""
         session.subject = message
         session.step = "ask_content"
-        event.set_result("好的，主题已记录。请告诉我邮件内容要点（我会帮你润色），或回复「自动生成」让我根据主题生成～")
+        reply = await self._get_reply(
+            f"用户提供了邮件主题「{session.subject}」",
+            "确认主题已记录，并询问邮件内容要点，或提示回复「自动生成」",
+            "好的，主题已记录。请告诉我邮件内容要点（我会帮你润色），或回复「自动生成」让我根据主题生成～"
+        )
+        event.set_result(reply)
 
     async def _handle_ask_content(self, event: AstrMessageEvent, session: EmailSession, message: str):
         """处理内容输入"""
@@ -373,7 +470,12 @@ class EmailSenderPlugin(Star):
         )
 
         if not generated_content:
-            event.set_result("邮件内容生成失败，请重试～")
+            reply = await self._get_reply(
+                "邮件内容生成失败",
+                "提示用户重试",
+                "邮件内容生成失败，请重试～"
+            )
+            event.set_result(reply)
             self._clear_session(event)
             return
 
@@ -406,11 +508,26 @@ class EmailSenderPlugin(Star):
             )
 
             if success:
-                event.set_result(f"邮件已成功发送到 {session.target_email}～")
+                reply = await self._get_reply(
+                    f"邮件已成功发送到 {session.target_email}",
+                    "告知用户邮件发送成功，语气轻松愉快",
+                    f"邮件已成功发送到 {session.target_email}～"
+                )
+                event.set_result(reply)
             else:
-                event.set_result("邮件发送失败，请检查 SMTP 配置或稍后重试～")
+                reply = await self._get_reply(
+                    "邮件发送失败",
+                    "告知用户邮件发送失败，建议检查配置或稍后重试",
+                    "邮件发送失败，请检查 SMTP 配置或稍后重试～"
+                )
+                event.set_result(reply)
         else:
-            event.set_result("已取消发送～")
+            reply = await self._get_reply(
+                "用户取消了邮件发送",
+                "告知用户已取消发送",
+                "已取消发送～"
+            )
+            event.set_result(reply)
 
         self._clear_session(event)
 
@@ -433,14 +550,29 @@ class EmailSenderPlugin(Star):
         if target_email:
             session.target_email = target_email
             session.step = "ask_subject"
-            event.set_result(f"好的，收件邮箱是 {session.target_email}。请告诉我邮件主题～")
+            reply = await self._get_reply(
+                f"用户要发邮件到 {session.target_email}",
+                "确认收件邮箱，并询问邮件主题",
+                f"好的，收件邮箱是 {session.target_email}。请告诉我邮件主题～"
+            )
+            event.set_result(reply)
         elif target_qq:
             session.target_qq = target_qq
             session.step = "ask_email_type"
-            event.set_result(f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复「是」或提供其他邮箱地址）")
+            reply = await self._get_reply(
+                f"用户要给 QQ 号 {session.target_qq} 发邮件",
+                "询问是否发送到 QQ 邮箱，或提供其他邮箱地址",
+                f"好的，目标 QQ 号是 {session.target_qq}。请问发到 QQ 邮箱吗？（回复「是」或提供其他邮箱地址）"
+            )
+            event.set_result(reply)
         else:
             session.step = "ask_target"
-            event.set_result("检测到你想发邮件，请告诉我收件人的 QQ 号或邮箱地址～")
+            reply = await self._get_reply(
+                "检测到用户想发邮件，但没有提供收件人",
+                "询问收件人的 QQ 号或邮箱地址",
+                "检测到你想发邮件，请告诉我收件人的 QQ 号或邮箱地址～"
+            )
+            event.set_result(reply)
 
         if intent.get("subject"):
             session.subject = intent["subject"]
