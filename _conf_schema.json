@@ -1,0 +1,37 @@
+{
+  "smtp.server": {
+    "description": "SMTP 服务器地址（QQ邮箱: smtp.qq.com，163邮箱: smtp.163.com）",
+    "type": "string",
+    "default": "smtp.qq.com"
+  },
+  "smtp.port": {
+    "description": "SMTP 端口（通常为 465 或 587）",
+    "type": "int",
+    "default": 465
+  },
+  "smtp.email": {
+    "description": "发件邮箱地址",
+    "type": "string",
+    "default": ""
+  },
+  "smtp.password": {
+    "description": "SMTP 授权码（QQ邮箱在设置-账户-POP3/IMAP/SMTP/Exchange/CardDAV/CalDAV服务中获取）",
+    "type": "string",
+    "default": ""
+  },
+  "smtp.use_ssl": {
+    "description": "是否使用 SSL 加密",
+    "type": "bool",
+    "default": true
+  },
+  "llm.intent_prompt": {
+    "description": "意图判断提示词（可自定义）",
+    "type": "text",
+    "default": ""
+  },
+  "llm.content_prompt": {
+    "description": "邮件内容生成提示词（可自定义）",
+    "type": "text",
+    "default": ""
+  }
+}
