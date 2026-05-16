@@ -100,8 +100,7 @@ class EmailSenderPlugin(Star):
             provider = self.context.get_using_provider()
             if not provider:
                 return ""
-            result = await asyncio.to_thread(
-                provider.text_chat,
+            result = await provider.text_chat(
                 prompt=prompt,
                 contexts=[],
                 image_urls=[]
